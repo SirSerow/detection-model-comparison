@@ -1,0 +1,6 @@
+name: rtdetrv2_s
+input_size: [640, 640]
+framework: pytorch
+requires_nms: false
+pytorch_supported: true
+checkpoint: weights/rtdetrv2/rtdetrv2_s.pth

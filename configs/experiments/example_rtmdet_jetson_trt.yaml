@@ -1,0 +1,27 @@
+experiment:
+  name: rtmdet_jetson_trt
+
+device: jetson_orin_nano_super
+
+dataset:
+  name: coco
+  split: benchmark_500
+
+model:
+  name: rtmdet_tiny
+  input_size: [640, 640]
+
+runtime:
+  name: tensorrt
+  precision: fp16
+
+benchmark:
+  batch_size: 1
+  warmup: 50
+  iterations: 500
+
+metrics:
+  - latency
+  - memory
+  - power
+  - utilization

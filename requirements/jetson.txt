@@ -1,0 +1,8 @@
+-r common.txt
+
+# Install the JetPack-matched wheels on the device; do not pip-install
+# desktop CUDA packages on Jetson.
+# torch
+# torchvision
+# onnxruntime-gpu
+# tensorrt

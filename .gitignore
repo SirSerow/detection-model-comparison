@@ -1,0 +1,53 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+dist/
+build/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Editors / OS
+.idea/
+.vscode/
+*.swp
+Thumbs.db
+Desktop.ini
+
+# Local env
+.env
+.env.*
+
+# Datasets — do not commit COCO images or annotation payloads
+datasets/coco/val2017/
+datasets/coco/annotations/*.json
+
+# Export / engine artifacts
+*.engine
+*.plan
+*.trt
+*.onnx
+*.param
+*.bin
+*.ncnn.bin
+*.ncnn.param
+
+# Benchmark result payloads (keep directory placeholders)
+results/raw/**
+!results/raw/.gitkeep
+results/processed/**
+!results/processed/.gitkeep
+results/summaries/**
+!results/summaries/.gitkeep
+results/figures/**
+!results/figures/.gitkeep

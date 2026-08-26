@@ -1,0 +1,26 @@
+name: jetson_orin_nano_super
+architecture: aarch64
+
+capabilities:
+  cuda: true
+  gpu: true
+
+supported_runtimes:
+  - pytorch
+  - onnxruntime
+  - tensorrt
+
+supported_precisions:
+  - fp32
+  - fp16
+  - int8
+
+benchmark:
+  warmup: 50
+  iterations: 500
+
+metrics:
+  temperature:
+    provider: linux_sysfs
+  power:
+    provider: tegrastats

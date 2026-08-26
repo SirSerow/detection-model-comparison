@@ -1,0 +1,6 @@
+name: yolo26n
+input_size: [640, 640]
+framework: pytorch
+requires_nms: true
+pytorch_supported: true
+checkpoint: weights/yolo26/yolo26n.pt

@@ -1,0 +1,6 @@
+name: picodet_s
+input_size: [640, 640]
+framework: paddle
+requires_nms: true
+pytorch_supported: false
+checkpoint: weights/picodet/picodet_s.pdparams

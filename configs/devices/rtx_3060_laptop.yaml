@@ -1,0 +1,28 @@
+name: rtx_3060_laptop
+architecture: x86_64
+
+capabilities:
+  cuda: true
+  gpu: true
+
+supported_runtimes:
+  - pytorch
+  - onnxruntime
+  - tensorrt
+
+supported_precisions:
+  - fp32
+  - fp16
+  - int8
+
+benchmark:
+  warmup: 50
+  iterations: 500
+
+metrics:
+  temperature:
+    provider: nvidia
+  power:
+    provider: nvidia_smi
+  utilization:
+    provider: nvidia

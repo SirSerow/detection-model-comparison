@@ -1,0 +1,6 @@
+name: rtmdet_tiny
+input_size: [640, 640]
+framework: pytorch
+requires_nms: true
+pytorch_supported: true
+checkpoint: weights/rtmdet/rtmdet_tiny.pth

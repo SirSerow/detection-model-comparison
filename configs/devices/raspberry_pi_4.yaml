@@ -1,0 +1,23 @@
+name: raspberry_pi_4
+architecture: aarch64
+
+capabilities:
+  cuda: false
+  gpu: false
+
+supported_runtimes:
+  - pytorch
+  - onnxruntime
+  - ncnn
+
+supported_precisions:
+  - fp32
+  - int8
+
+benchmark:
+  warmup: 20
+  iterations: 500
+
+metrics:
+  temperature:
+    provider: linux_sysfs

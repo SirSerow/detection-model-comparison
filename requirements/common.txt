@@ -1,0 +1,8 @@
+# Shared skeleton dependencies. Prefer: pip install -e ".[dev]"
+-e .
+pyyaml>=6.0
+
+# Deferred until adapters are implemented (do not import from stubs):
+# numpy
+# opencv-python
+# pycocotools

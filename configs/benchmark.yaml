@@ -1,0 +1,8 @@
+# Shared default benchmark settings. Device YAML may override warmup/iterations.
+input_width: 640
+input_height: 640
+batch_size: 1
+warmup: 50
+iterations: 500
+confidence_threshold: 0.25
+iou_threshold: 0.65

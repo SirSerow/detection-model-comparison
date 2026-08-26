@@ -1,0 +1,6 @@
+name: rfdetr_nano
+input_size: [640, 640]
+framework: pytorch
+requires_nms: false
+pytorch_supported: true
+checkpoint: weights/rfdetr/rfdetr_nano.pth

@@ -1,0 +1,7 @@
+-r common.txt
+
+# Desktop/laptop CUDA stack. Pin versions to the local driver/CUDA toolkit.
+# torch
+# torchvision
+# onnxruntime-gpu
+# tensorrt
