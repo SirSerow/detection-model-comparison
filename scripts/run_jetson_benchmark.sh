@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Jetson Orin Nano Super benchmark driver. Run on-device inside the project venv.
 set -euo pipefail
-echo "edgebench scripts/run_jetson_benchmark.sh is not implemented yet." >&2
-exit 1
+cd "$(dirname "$0")/.."
+source .venv/bin/activate
+python scripts/run_all.py --device jetson_orin_nano_super "$@"
+python -m edgebench report

@@ -224,7 +224,7 @@ def test_runner_records_unsupported_precision() -> None:
     assert "fp16" in result.unsupported_reason
 
 
-def test_supported_combination_is_not_implemented() -> None:
+def test_supported_combination_binds_artifact_path() -> None:
     profile = DeviceRegistry.load().get("jetson_orin_nano_super")
     runner = BenchmarkRunner(
         _experiment(
@@ -234,8 +234,26 @@ def test_supported_combination_is_not_implemented() -> None:
             profile=profile,
         )
     )
-    with pytest.raises(NotImplementedError, match="Phase 0"):
-        runner.run()
+    bound = runner.bind()
+    assert bound.session.artifact_path is not None
+    assert bound.session.artifact_path.endswith(
+        "yolox_tiny_tensorrt_fp16.engine"
+    )
+    assert "weights/yolox" in bound.session.artifact_path
+
+
+def test_pytorch_session_has_no_artifact_path() -> None:
+    profile = DeviceRegistry.load().get("jetson_orin_nano_super")
+    runner = BenchmarkRunner(
+        _experiment(
+            device="jetson_orin_nano_super",
+            runtime="pytorch",
+            precision="fp16",
+            profile=profile,
+        )
+    )
+    bound = runner.bind()
+    assert bound.session.artifact_path is None
 
 
 def test_bind_uses_session_options_from_profile() -> None:

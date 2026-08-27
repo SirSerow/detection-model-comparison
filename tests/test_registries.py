@@ -98,6 +98,7 @@ def test_picodet_pytorch_is_unsupported() -> None:
     config = load_model_config("picodet_s")
     assert config.framework == "paddle"
     assert config.pytorch_supported is False
+    assert config.upstream_config is not None
 
     yolox = load_model_config("yolox_tiny")
     assert yolox.pytorch_supported is True

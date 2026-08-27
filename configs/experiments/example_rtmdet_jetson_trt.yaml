@@ -7,9 +7,7 @@ dataset:
   name: coco
   split: benchmark_500
 
-model:
-  name: rtmdet_tiny
-  input_size: [640, 640]
+model: rtmdet_tiny
 
 runtime:
   name: tensorrt

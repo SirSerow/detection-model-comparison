@@ -52,6 +52,7 @@ class ModelConfig:
     framework: str = "pytorch"
     requires_nms: bool = True
     checkpoint: str | None = None
+    upstream_config: str | None = None
     pytorch_supported: bool = True
 
     @classmethod
@@ -65,6 +66,7 @@ class ModelConfig:
             framework=str(data.get("framework", "pytorch")),
             requires_nms=bool(data.get("requires_nms", True)),
             checkpoint=data.get("checkpoint"),
+            upstream_config=data.get("upstream_config"),
             pytorch_supported=bool(data.get("pytorch_supported", True)),
         )
 

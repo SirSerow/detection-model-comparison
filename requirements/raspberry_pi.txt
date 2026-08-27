@@ -5,3 +5,5 @@
 # torchvision
 # onnxruntime
 # ncnn
+# PyTorch model packages are optional on Pi; exported ONNX/NCNN artifacts can
+# be produced on a compatible build machine and copied into weights/.

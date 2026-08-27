@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Raspberry Pi 4 benchmark driver. Run on-device inside the project venv.
 set -euo pipefail
-echo "edgebench scripts/run_rpi_benchmark.sh is not implemented yet." >&2
-exit 1
+cd "$(dirname "$0")/.."
+source .venv/bin/activate
+python scripts/run_all.py --device raspberry_pi_4 "$@"
+python -m edgebench report

@@ -4,3 +4,4 @@ framework: pytorch
 requires_nms: true
 pytorch_supported: true
 checkpoint: weights/rtmdet/rtmdet_tiny.pth
+upstream_config: third_party/mmdetection/configs/rtmdet/rtmdet_tiny_8xb32-300e_coco.py

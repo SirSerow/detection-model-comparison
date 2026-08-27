@@ -4,3 +4,4 @@ framework: pytorch
 requires_nms: false
 pytorch_supported: true
 checkpoint: weights/rtdetrv2/rtdetrv2_s.pth
+upstream_config: third_party/RT-DETR/rtdetrv2_pytorch/configs/rtdetrv2/rtdetrv2_r18vd_120e_coco.yml

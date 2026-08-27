@@ -29,6 +29,9 @@ Desktop.ini
 .env
 .env.*
 
+# Optional upstream detector source trees (installed/cloned per target device)
+third_party/
+
 # Datasets — do not commit COCO images or annotation payloads
 datasets/coco/val2017/
 datasets/coco/annotations/*.json

@@ -6,3 +6,6 @@
 # torchvision
 # onnxruntime-gpu
 # tensorrt
+# Install only the detector packages needed on this device:
+# ultralytics, mmdet/mmengine/mmcv, rfdetr
+# DAMO-YOLO and RT-DETRv2 use their official source trees under third_party/.

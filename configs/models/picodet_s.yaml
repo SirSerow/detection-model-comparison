@@ -4,3 +4,4 @@ framework: paddle
 requires_nms: true
 pytorch_supported: false
 checkpoint: weights/picodet/picodet_s.pdparams
+upstream_config: third_party/PaddleDetection/configs/picodet/picodet_s_320_coco_lcnet.yml

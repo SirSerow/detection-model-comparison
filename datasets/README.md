@@ -2,9 +2,9 @@
 
 Do not commit COCO images or annotation JSON to this repository.
 
-## MS COCO 2017 (planned)
+## MS COCO 2017
 
-Download locally (not implemented by the skeleton):
+Download locally:
 
 1. `val2017` images
 2. `annotations/instances_val2017.json`
@@ -22,7 +22,9 @@ datasets/
     └── coco_benchmark_500.txt
 ```
 
-Split files should list image IDs only. Generate `coco_benchmark_500.txt` once with a fixed seed and reuse the same IDs on every device, model, and runtime.
+Split files list image IDs only. Run `python scripts/generate_coco_splits.py`
+to regenerate the full and deterministic 500-image splits (seed 20240613),
+then reuse the same IDs on every device, model, and runtime.
 
 COCO source images retain their original Flickr licenses. Use them for evaluation; do not redistribute the image set from this repo.
 
