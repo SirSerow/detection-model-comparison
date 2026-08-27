@@ -1,0 +1,48 @@
+name: rtx_5070_laptop
+architecture: x86_64
+
+capabilities:
+  cuda: true
+  gpu: true
+
+backends:
+  - runtime: pytorch
+    precision: fp16
+    device_target: cuda
+  - runtime: pytorch
+    precision: fp32
+    device_target: cuda
+  - runtime: onnxruntime
+    precision: fp16
+    device_target: cuda
+    execution_provider: CUDAExecutionProvider
+  - runtime: onnxruntime
+    precision: fp32
+    device_target: cuda
+    execution_provider: CUDAExecutionProvider
+  - runtime: tensorrt
+    precision: fp16
+    device_target: cuda
+  - runtime: tensorrt
+    precision: int8
+    device_target: cuda
+
+benchmark:
+  warmup: 50
+  iterations: 500
+
+metrics:
+  temperature:
+    provider: nvidia
+  power:
+    provider: nvidia_smi
+  utilization:
+    provider: nvidia
+
+metadata:
+  cpu: 13th Gen Intel Core i7-13700HX
+  gpu_name: NVIDIA GeForce RTX 5070 Laptop GPU
+  gpu_vram_mb: 8151
+  driver_version: 580.173.02
+  power_source: ac
+  gpu_default_power_limit_w: 50.0

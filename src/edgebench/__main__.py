@@ -88,16 +88,34 @@ def _cmd_export(model: str, target: str, precision: str, onnx_path: str | None) 
     adapter = get_detector(model)
     adapter.configure(config, _default_settings())
     if target == "onnx":
+        if precision not in {"fp16", "fp32"}:
+            raise ValueError("ONNX export precision must be 'fp16' or 'fp32'")
         artifact = artifact_path_for(
             model, "onnxruntime", precision, checkpoint=config.checkpoint
         )
         adapter.export_onnx(str(artifact))
+        if precision == "fp16":
+            from edgebench.exporters.onnx import convert_onnx_to_fp16
+
+            convert_onnx_to_fp16(artifact)
         print(f"wrote {artifact}")
         return 0
 
-    source = Path(onnx_path) if onnx_path else artifact_path_for(
-        model, "onnxruntime", "fp32", checkpoint=config.checkpoint
-    )
+    if onnx_path:
+        source = Path(onnx_path)
+    else:
+        source_precision = (
+            precision
+            if target == "tensorrt" and precision in {"fp16", "fp32"}
+            else "fp32"
+        )
+        source = artifact_path_for(
+            model, "onnxruntime", source_precision, checkpoint=config.checkpoint
+        )
+        if source_precision != "fp32" and not source.is_file():
+            source = artifact_path_for(
+                model, "onnxruntime", "fp32", checkpoint=config.checkpoint
+            )
     if target == "tensorrt":
         from edgebench.exporters.tensorrt import export_tensorrt
 

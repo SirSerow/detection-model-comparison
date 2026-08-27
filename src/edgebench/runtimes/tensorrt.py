@@ -134,17 +134,24 @@ class _CudaBindings:
 
     def __init__(self) -> None:
         try:
-            from cuda import cuda as cuda_driver
+            from cuda.bindings import driver as cuda_driver
 
             self._kind = "cuda-python"
             self._drv = cuda_driver
             self._drv.cuInit(0)
         except ImportError:
-            import pycuda.autoinit  # noqa: F401  (initializes the CUDA context)
-            import pycuda.driver as cuda_driver
+            try:
+                from cuda import cuda as cuda_driver
 
-            self._kind = "pycuda"
-            self._drv = cuda_driver
+                self._kind = "cuda-python"
+                self._drv = cuda_driver
+                self._drv.cuInit(0)
+            except ImportError:
+                import pycuda.autoinit  # noqa: F401  (initializes the CUDA context)
+                import pycuda.driver as cuda_driver
+
+                self._kind = "pycuda"
+                self._drv = cuda_driver
 
     def create_stream(self) -> Any:
         if self._kind == "cuda-python":

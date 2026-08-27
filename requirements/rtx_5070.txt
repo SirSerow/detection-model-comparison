@@ -1,0 +1,35 @@
+-r common.txt
+
+# Validated on RTX 5070 Laptop GPU, driver 580.173.02 (CUDA 13 capable).
+torch==2.13.0
+torchvision==0.28.0
+ultralytics==8.4.130
+onnx==1.22.0
+onnxscript==0.7.1
+onnxconverter-common==1.16.0
+
+# ORT 1.23 is CUDA 12.8-based; its extras install the matching CUDA/cuDNN
+# libraries alongside PyTorch's CUDA 13 stack to prevent CPU fallback.
+onnxruntime-gpu[cuda,cudnn]==1.23.2
+
+# TensorRT's library wheel is served from NVIDIA's package index.
+--extra-index-url https://pypi.nvidia.com/
+tensorrt-cu13==11.2.1.2
+
+# Official model adapters used by the RTX comparison matrix.
+loguru
+tabulate
+thop
+ninja
+timm
+omegaconf
+scikit-image
+easydict
+tensorboard
+scipy
+faster-coco-eval
+rfdetr==1.9.4
+mmengine==0.10.7
+mmcv-lite==2.1.0
+terminaltables
+shapely

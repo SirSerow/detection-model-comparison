@@ -1,0 +1,7 @@
+experiment:
+  name: yolox_rtx5070_tensorrt_fp16
+device: rtx_5070_laptop
+dataset: {name: coco, split: benchmark_500}
+model: yolox_tiny
+runtime: {name: tensorrt, precision: fp16}
+metrics: [latency, memory, power, temperature, utilization]

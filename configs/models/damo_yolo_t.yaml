@@ -4,4 +4,4 @@ framework: pytorch
 requires_nms: true
 pytorch_supported: true
 checkpoint: weights/damo_yolo/damo_yolo_t.pth
-upstream_config: third_party/DAMO-YOLO/configs/damoyolo_tinynasL25_S.py
+upstream_config: third_party/DAMO-YOLO/configs/damoyolo_tinynasL20_T.py

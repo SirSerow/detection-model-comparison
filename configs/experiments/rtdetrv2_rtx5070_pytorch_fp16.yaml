@@ -1,0 +1,6 @@
+experiment: {name: rtdetrv2_rtx5070_pytorch_fp16}
+device: rtx_5070_laptop
+dataset: {name: coco, split: benchmark_500}
+model: rtdetrv2_s
+runtime: {name: pytorch, precision: fp16}
+metrics: [latency, memory, power, temperature, utilization]

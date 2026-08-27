@@ -7,6 +7,7 @@ measures the same graph.
 
 from __future__ import annotations
 
+import sys
 from typing import TYPE_CHECKING, Any
 
 from edgebench.models._common import (
@@ -16,6 +17,7 @@ from edgebench.models._common import (
     output_sequence,
     prepare_image,
 )
+from edgebench.paths import REPO_ROOT
 
 if TYPE_CHECKING:
     import numpy as np
@@ -82,7 +84,12 @@ class RTMDetTinyAdapter(ConfiguredDetector):
         cls_levels.sort(key=lambda item: item.shape[2] * item.shape[3], reverse=True)
         box_levels.sort(key=lambda item: item.shape[2] * item.shape[3], reverse=True)
         for stride, cls_map, box_map in zip(_STRIDES, cls_levels, box_levels):
-            cls_map = cls_map[0].transpose(1, 2, 0).reshape(-1, _NUM_CLASSES)
+            cls_map = (
+                cls_map[0]
+                .transpose(1, 2, 0)
+                .reshape(-1, _NUM_CLASSES)
+                .astype(np.float32)
+            )
             scores = 1.0 / (1.0 + np.exp(-np.clip(cls_map, -88.0, 88.0)))
             # RTMDetSepBNHead already multiplies regression distances by stride.
             distances = box_map[0].transpose(1, 2, 0).reshape(-1, 4)
@@ -108,6 +115,30 @@ class RTMDetTinyAdapter(ConfiguredDetector):
         )
 
     def load_pytorch(self) -> Any:
+        upstream_root = REPO_ROOT / "third_party" / "mmdetection"
+        if upstream_root.is_dir() and str(upstream_root) not in sys.path:
+            sys.path.insert(0, str(upstream_root))
+        # RTMDet's raw backbone/neck/head forward is implemented entirely with
+        # PyTorch.  MMDetection nevertheless imports optional compiled MMCV ops
+        # (ROIAlign, NMS, etc.) while registering unrelated model families.
+        # Keep those imports lazy on new Torch/CUDA versions where no matching
+        # MMCV extension wheel exists; the benchmark never calls these stubs.
+        import mmcv.utils.ext_loader
+
+        class UnavailableExtension:
+            def __init__(self, functions: list[str]) -> None:
+                for function in functions:
+                    setattr(self, function, self._raise)
+
+            @staticmethod
+            def _raise(*args: Any, **kwargs: Any) -> None:
+                raise RuntimeError(
+                    "This RTMDet raw-head benchmark does not provide compiled MMCV ops"
+                )
+
+        mmcv.utils.ext_loader.load_ext = (
+            lambda _name, functions: UnavailableExtension(functions)
+        )
         try:
             from mmdet.apis import init_detector
         except ImportError as exc:
@@ -116,11 +147,24 @@ class RTMDetTinyAdapter(ConfiguredDetector):
                 "the official mmdetection package on the target device."
             ) from exc
 
-        model = init_detector(
-            str(self.upstream_config_path()), str(self.checkpoint_path()), device="cpu"
-        )
-
         import torch
+
+        model = init_detector(
+            str(self.upstream_config_path()), checkpoint=None, device="cpu"
+        )
+        checkpoint = torch.load(
+            self.checkpoint_path(), map_location="cpu", weights_only=False
+        )
+        incompatible = model.load_state_dict(checkpoint["state_dict"], strict=False)
+        unexpected = set(incompatible.unexpected_keys) - {
+            "data_preprocessor.mean",
+            "data_preprocessor.std",
+        }
+        if incompatible.missing_keys or unexpected:
+            raise RuntimeError(
+                "Official RTMDet checkpoint does not match the configured model: "
+                f"missing={incompatible.missing_keys}, unexpected={sorted(unexpected)}"
+            )
 
         class RawHead(torch.nn.Module):
             def __init__(self, detector: Any) -> None:

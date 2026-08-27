@@ -100,6 +100,22 @@ def test_onnxruntime_missing_artifact_raises(tmp_path: Path) -> None:
         backend.load()
 
 
+def test_onnxruntime_rejects_unavailable_provider(tmp_path: Path) -> None:
+    pytest.importorskip("onnxruntime")
+    artifact = tmp_path / "scale.onnx"
+    _write_scale_model(artifact)
+    backend = ONNXRuntimeBackend(
+        RuntimeSessionConfig(
+            name="onnxruntime",
+            precision="fp32",
+            execution_provider="MissingExecutionProvider",
+            artifact_path=str(artifact),
+        )
+    )
+    with pytest.raises(RuntimeError, match="is not available"):
+        backend.load()
+
+
 def test_onnxruntime_supports_named_multi_input(tmp_path: Path) -> None:
     pytest.importorskip("onnxruntime")
     artifact = tmp_path / "add.onnx"
@@ -122,3 +138,31 @@ def test_onnxruntime_supports_named_multi_input(tmp_path: Path) -> None:
     assert np.allclose(output, 3.0)
     with pytest.raises(ValueError, match="Missing ONNX inputs"):
         backend.infer({"left": np.ones((1, 3, 8, 8), dtype=np.float32)})
+
+
+def test_fp16_conversion_uses_float16_io(tmp_path: Path) -> None:
+    onnx = pytest.importorskip("onnx")
+    pytest.importorskip("onnxruntime")
+    from edgebench.exporters.onnx import convert_onnx_to_fp16
+
+    artifact = tmp_path / "scale.onnx"
+    _write_scale_model(artifact)
+    convert_onnx_to_fp16(artifact)
+
+    model = onnx.load(str(artifact))
+    assert model.graph.input[0].type.tensor_type.elem_type == onnx.TensorProto.FLOAT16
+    assert model.graph.output[0].type.tensor_type.elem_type == onnx.TensorProto.FLOAT16
+    assert model.graph.initializer[0].data_type == onnx.TensorProto.FLOAT16
+
+    backend = ONNXRuntimeBackend(
+        RuntimeSessionConfig(
+            name="onnxruntime",
+            precision="fp16",
+            execution_provider="CPUExecutionProvider",
+            artifact_path=str(artifact),
+        )
+    )
+    backend.load()
+    output = backend.infer(np.full((1, 3, 8, 8), 3.0, dtype=np.float32))
+    assert output.dtype == np.float16
+    assert np.allclose(output, 6.0)

@@ -18,6 +18,7 @@ checkpoint path. The model definition comes from the ``yolox`` package
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -116,6 +117,9 @@ class YOLOXTinyAdapter(DetectorAdapter):
         import torch
 
         checkpoint = self._checkpoint_path()
+        upstream_root = REPO_ROOT / "third_party" / "YOLOX"
+        if upstream_root.is_dir() and str(upstream_root) not in sys.path:
+            sys.path.insert(0, str(upstream_root))
         try:
             from yolox.exp import get_exp
         except ImportError as exc:

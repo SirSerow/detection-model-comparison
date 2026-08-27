@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING, Any
 
 from edgebench.models._common import (
     ConfiguredDetector,
+    decode_xyxy_scores,
     detections_from_arrays,
     output_sequence,
     prepare_image,
@@ -70,9 +71,35 @@ class PicoDetSAdapter(ConfiguredDetector):
             None,
         )
         if bbox is None:
-            raise ValueError(
-                "Unexpected PicoDet output shapes; expected PaddleDetection "
-                f"bbox rows (*,6), received {[item.shape for item in outputs]}"
+            boxes = next(
+                (item for item in outputs if item.ndim >= 2 and item.shape[-1] == 4),
+                None,
+            )
+            scores = next(
+                (
+                    item
+                    for item in outputs
+                    if item.ndim >= 2
+                    and (item.shape[-1] == 80 or item.shape[-2] == 80)
+                ),
+                None,
+            )
+            if boxes is None or scores is None:
+                raise ValueError(
+                    "Unexpected PicoDet output shapes; expected deployed bbox "
+                    "rows (*,6) or raw boxes/scores, received "
+                    f"{[item.shape for item in outputs]}"
+                )
+            boxes = boxes[0] if boxes.ndim == 3 else boxes
+            scores = scores[0] if scores.ndim == 3 else scores
+            if scores.shape[0] == 80 and scores.shape[-1] != 80:
+                scores = scores.T
+            return decode_xyxy_scores(
+                boxes,
+                scores,
+                metadata,
+                threshold=self.confidence_threshold,
+                iou_threshold=self.iou_threshold,
             )
         if bbox.ndim == 3:
             bbox = bbox[0]
@@ -117,6 +144,8 @@ class PicoDetSAdapter(ConfiguredDetector):
                     "-o",
                     f"weights={self.checkpoint_path()}",
                     "use_gpu=False",
+                    f"eval_size=[{height},{width}]",
+                    "export.nms=False",
                     f"TestReader.inputs_def.image_shape=[1,3,{height},{width}]",
                 ],
                 cwd=repository,

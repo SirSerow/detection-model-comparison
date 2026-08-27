@@ -1,8 +1,9 @@
-"""DAMO-YOLO-T adapter using the official TinyNAS-L25-S configuration."""
+"""DAMO-YOLO-T adapter using the official TinyNAS-L20-T configuration."""
 
 from __future__ import annotations
 
 import os
+import sys
 from typing import TYPE_CHECKING, Any
 
 from edgebench.models._common import (
@@ -11,6 +12,7 @@ from edgebench.models._common import (
     output_sequence,
     prepare_image,
 )
+from edgebench.paths import REPO_ROOT
 
 if TYPE_CHECKING:
     import numpy as np
@@ -27,13 +29,13 @@ class DAMOYOLOTAdapter(ConfiguredDetector):
         return "damo_yolo_t"
 
     def preprocess(self, image: np.ndarray) -> tuple[np.ndarray, ResizeMeta]:
-        # DAMO's demo converts to RGB, stretches and ToTensor-scales to 0..1.
+        # Official test transforms stretch OpenCV BGR input and preserve the
+        # original 0..255 float range (ToTensor wraps without rescaling).
         return prepare_image(
             image,
             self.input_size,
             geometry="resize",
-            rgb=True,
-            scale=255.0,
+            rgb=False,
         )
 
     def postprocess(self, raw_output: Any, metadata: ResizeMeta) -> list[Detection]:
@@ -56,6 +58,9 @@ class DAMOYOLOTAdapter(ConfiguredDetector):
         )
 
     def load_pytorch(self) -> Any:
+        upstream_root = REPO_ROOT / "third_party" / "DAMO-YOLO"
+        if upstream_root.is_dir() and str(upstream_root) not in sys.path:
+            sys.path.insert(0, str(upstream_root))
         try:
             import torch
             from damo.base_models.core.ops import RepConv
@@ -75,9 +80,19 @@ class DAMOYOLOTAdapter(ConfiguredDetector):
             config = parse_config(str(config_path))
         finally:
             os.chdir(previous_directory)
-        model = build_local_model(config, "cpu")
-        checkpoint = torch.load(self.checkpoint_path(), map_location="cpu")
+        checkpoint = torch.load(
+            self.checkpoint_path(), map_location="cpu", weights_only=False
+        )
         state = checkpoint.get("model", checkpoint)
+        # The official 43.0 mAP Google Drive checkpoint predates the refreshed
+        # 43.6 weights and retains DAMO's legacy 81-channel classification
+        # head. The final channel is discarded by ZeroHead during inference.
+        if any(
+            key.endswith("gfl_cls.0.weight") and value.shape[0] == 81
+            for key, value in state.items()
+        ):
+            config.model.head.legacy = True
+        model = build_local_model(config, "cpu")
         model.load_state_dict(state, strict=True)
         model.head.nms = False
         for layer in model.modules():

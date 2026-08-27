@@ -67,7 +67,11 @@ class YOLO26nAdapter(ConfiguredDetector):
 
             def forward(self, images: Any) -> Any:
                 output = self.detector(images)
-                return output[0] if isinstance(output, (tuple, list)) else output
+                output = output[0] if isinstance(output, (tuple, list)) else output
+                # The legacy ONNX exporter can promote YOLO26's decoded box
+                # arithmetic to float64 because stride constants are doubles.
+                # An explicit boundary cast keeps the deployable graph FP32.
+                return output.float()
 
         return OneToManyOutput(model).eval()
 

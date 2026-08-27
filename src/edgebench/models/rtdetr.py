@@ -57,6 +57,10 @@ class RTDETRv2SAdapter(ConfiguredDetector):
             ) from exc
 
         config = YAMLConfig(str(config_path))
+        # The full COCO checkpoint includes backbone weights. Disable the
+        # training-time ImageNet download before materializing the model.
+        if "PResNet" in config.yaml_cfg:
+            config.yaml_cfg["PResNet"]["pretrained"] = False
         checkpoint = torch.load(self.checkpoint_path(), map_location="cpu")
         state = (
             checkpoint["ema"]["module"]

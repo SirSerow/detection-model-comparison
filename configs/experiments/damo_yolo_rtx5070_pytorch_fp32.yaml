@@ -1,0 +1,6 @@
+experiment: {name: damo_yolo_rtx5070_pytorch_fp32}
+device: rtx_5070_laptop
+dataset: {name: coco, split: benchmark_500}
+model: damo_yolo_t
+runtime: {name: pytorch, precision: fp32}
+metrics: [latency, memory, power, temperature, utilization]

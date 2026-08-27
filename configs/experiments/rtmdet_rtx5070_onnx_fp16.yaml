@@ -1,0 +1,6 @@
+experiment: {name: rtmdet_rtx5070_onnx_fp16}
+device: rtx_5070_laptop
+dataset: {name: coco, split: benchmark_500}
+model: rtmdet_tiny
+runtime: {name: onnxruntime, precision: fp16}
+metrics: [latency, memory, power, temperature, utilization]

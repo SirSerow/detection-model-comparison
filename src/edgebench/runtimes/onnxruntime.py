@@ -21,6 +21,7 @@ class ONNXRuntimeBackend(RuntimeBackend):
         self.session = session
         self._session: Any = None
         self._input_names: list[str] = []
+        self._input_dtypes: dict[str, Any] = {}
 
     @property
     def name(self) -> str:
@@ -46,11 +47,41 @@ class ONNXRuntimeBackend(RuntimeBackend):
         options = onnxruntime.SessionOptions()
         if session.threads:
             options.intra_op_num_threads = int(session.threads)
-        providers = [session.execution_provider] if session.execution_provider else None
+        requested_provider = session.execution_provider
+        if requested_provider:
+            available = onnxruntime.get_available_providers()
+            if requested_provider not in available:
+                raise RuntimeError(
+                    f"Requested ONNX Runtime provider '{requested_provider}' is not "
+                    f"available; installed providers: {available}"
+                )
+            if requested_provider == "CUDAExecutionProvider" and hasattr(
+                onnxruntime, "preload_dlls"
+            ):
+                # Prefer the CUDA/cuDNN libraries installed alongside the ORT
+                # wheel. This is required when PyTorch uses another CUDA major.
+                onnxruntime.preload_dlls(directory="")
+        providers = [requested_provider] if requested_provider else None
         self._session = onnxruntime.InferenceSession(
             str(artifact), sess_options=options, providers=providers
         )
-        self._input_names = [item.name for item in self._session.get_inputs()]
+        if requested_provider and requested_provider not in self._session.get_providers():
+            raise RuntimeError(
+                f"ONNX Runtime failed to activate '{requested_provider}' and fell "
+                f"back to {self._session.get_providers()}"
+            )
+        inputs = self._session.get_inputs()
+        self._input_names = [item.name for item in inputs]
+        import numpy as np
+
+        type_map = {
+            "tensor(float16)": np.float16,
+            "tensor(float)": np.float32,
+            "tensor(double)": np.float64,
+        }
+        self._input_dtypes = {
+            item.name: type_map.get(item.type, np.float32) for item in inputs
+        }
 
     def warmup(self, input_data: np.ndarray) -> None:
         """One untimed inference; the runner drives the warm-up count."""
@@ -66,7 +97,9 @@ class ONNXRuntimeBackend(RuntimeBackend):
             if missing:
                 raise ValueError(f"Missing ONNX inputs: {', '.join(missing)}")
             feed = {
-                name: np.ascontiguousarray(input_data[name], dtype=np.float32)
+                name: np.ascontiguousarray(
+                    input_data[name], dtype=self._input_dtypes[name]
+                )
                 for name in self._input_names
             }
         else:
@@ -76,7 +109,7 @@ class ONNXRuntimeBackend(RuntimeBackend):
                 )
             feed = {
                 self._input_names[0]: np.ascontiguousarray(
-                    input_data, dtype=np.float32
+                    input_data, dtype=self._input_dtypes[self._input_names[0]]
                 )
             }
         outputs = self._session.run(None, feed)

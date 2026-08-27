@@ -122,22 +122,22 @@ class BenchmarkRunner:
         predictions: dict[int, list[Detection]] = {}
         wall_start = time.perf_counter()
         for index in range(iterations):
+            for collector in collectors:
+                collector.before_inference()
             e2e_start = time.perf_counter()
             image = dataset.get_image(index)
             input_data, meta = adapter.preprocess(image)
 
-            for collector in collectors:
-                collector.before_inference()
             runtime.synchronize()
             model_start = time.perf_counter()
             raw_output = runtime.infer(input_data)
             runtime.synchronize()
             model_end = time.perf_counter()
-            for collector in collectors:
-                collector.after_inference()
 
             detections = adapter.postprocess(raw_output, meta)
             e2e_end = time.perf_counter()
+            for collector in collectors:
+                collector.after_inference()
 
             model_samples_ms.append((model_end - model_start) * 1000.0)
             e2e_samples_ms.append((e2e_end - e2e_start) * 1000.0)
@@ -304,9 +304,20 @@ def _software_versions() -> dict[str, str]:
     from importlib import metadata
 
     versions: dict[str, str] = {}
-    for package in ("torch", "onnxruntime", "tensorrt", "ncnn", "pycocotools", "numpy"):
-        try:
-            versions[package] = metadata.version(package)
-        except metadata.PackageNotFoundError:
-            continue
+    packages = {
+        "torch": ("torch",),
+        "ultralytics": ("ultralytics",),
+        "onnxruntime": ("onnxruntime-gpu", "onnxruntime"),
+        "tensorrt": ("tensorrt", "tensorrt-cu13", "tensorrt-cu12"),
+        "ncnn": ("ncnn",),
+        "pycocotools": ("pycocotools",),
+        "numpy": ("numpy",),
+    }
+    for label, candidates in packages.items():
+        for package in candidates:
+            try:
+                versions[label] = metadata.version(package)
+                break
+            except metadata.PackageNotFoundError:
+                continue
     return versions

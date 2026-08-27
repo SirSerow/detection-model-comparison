@@ -1,0 +1,6 @@
+experiment: {name: picodet_rtx5070_onnx_fp32}
+device: rtx_5070_laptop
+dataset: {name: coco, split: benchmark_500}
+model: picodet_s
+runtime: {name: onnxruntime, precision: fp32}
+metrics: [latency, memory, power, temperature, utilization]

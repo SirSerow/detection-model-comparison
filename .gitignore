@@ -35,12 +35,19 @@ third_party/
 # Datasets — do not commit COCO images or annotation payloads
 datasets/coco/val2017/
 datasets/coco/annotations/*.json
+datasets/coco/*.zip
+
+# Downloaded model checkpoints
+weights/**/*.pt
+weights/**/*.pth
+weights/**/*.pdparams
 
 # Export / engine artifacts
 *.engine
 *.plan
 *.trt
 *.onnx
+*.onnx.data
 *.param
 *.bin
 *.ncnn.bin

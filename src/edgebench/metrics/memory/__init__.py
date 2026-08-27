@@ -1,8 +1,8 @@
-"""RAM/VRAM peak collector.
+"""Per-process RAM/VRAM peak collector.
 
-RAM: peak RSS of this process, sampled around every inference and at run
-end. VRAM: ``torch.cuda.max_memory_allocated`` when torch with CUDA is in
-use; ``None`` otherwise (never fabricated).
+RAM uses process RSS. VRAM uses NVML's per-process allocation when available,
+which keeps the measurement comparable across PyTorch, ONNX Runtime, and
+TensorRT. PyTorch allocator statistics remain a fallback for non-NVML setups.
 """
 
 from __future__ import annotations
@@ -20,10 +20,16 @@ class MemoryCollector(MetricCollector):
     def __init__(self) -> None:
         self._process: psutil.Process | None = None
         self._peak_rss_bytes = 0
+        self._peak_vram_bytes = 0
+        self._nvml: Any = None
+        self._nvml_handle: Any = None
 
     def on_run_start(self) -> None:
         self._process = psutil.Process()
         self._peak_rss_bytes = self._rss_bytes()
+        self._peak_vram_bytes = 0
+        self._start_nvml()
+        self._sample()
 
     def before_inference(self) -> None:
         self._sample()
@@ -49,9 +55,40 @@ class MemoryCollector(MetricCollector):
         if self._process is None:
             return
         self._peak_rss_bytes = max(self._peak_rss_bytes, self._rss_bytes())
+        self._peak_vram_bytes = max(self._peak_vram_bytes, self._nvml_vram_bytes())
 
-    @staticmethod
-    def _vram_peak_mb() -> float | None:
+    def _start_nvml(self) -> None:
+        try:
+            import pynvml
+
+            pynvml.nvmlInit()
+            self._nvml = pynvml
+            self._nvml_handle = pynvml.nvmlDeviceGetHandleByIndex(0)
+        except Exception:
+            self._nvml = None
+            self._nvml_handle = None
+
+    def _nvml_vram_bytes(self) -> int:
+        if self._nvml is None or self._nvml_handle is None or self._process is None:
+            return 0
+        try:
+            processes = self._nvml.nvmlDeviceGetComputeRunningProcesses(
+                self._nvml_handle
+            )
+        except Exception:
+            return 0
+        used = sum(
+            int(process.usedGpuMemory)
+            for process in processes
+            if process.pid == self._process.pid
+            and isinstance(process.usedGpuMemory, int)
+            and 0 < process.usedGpuMemory < (1 << 60)
+        )
+        return used
+
+    def _vram_peak_mb(self) -> float | None:
+        if self._peak_vram_bytes > 0:
+            return self._peak_vram_bytes / (1024.0 * 1024.0)
         try:
             import torch
         except ImportError:
