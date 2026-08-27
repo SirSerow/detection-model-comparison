@@ -1,18 +1,25 @@
 name: raspberry_pi_4
 architecture: aarch64
+default_threads: 4
 
 capabilities:
   cuda: false
   gpu: false
 
-supported_runtimes:
-  - pytorch
-  - onnxruntime
-  - ncnn
-
-supported_precisions:
-  - fp32
-  - int8
+backends:
+  - runtime: pytorch
+    precision: fp32
+    device_target: cpu
+  - runtime: onnxruntime
+    precision: fp32
+    device_target: cpu
+    execution_provider: CPUExecutionProvider
+  - runtime: ncnn
+    precision: fp32
+    device_target: cpu
+  - runtime: ncnn
+    precision: int8
+    device_target: cpu
 
 benchmark:
   warmup: 20
@@ -21,3 +28,7 @@ benchmark:
 metrics:
   temperature:
     provider: linux_sysfs
+
+metadata:
+  cpu: Cortex-A72
+

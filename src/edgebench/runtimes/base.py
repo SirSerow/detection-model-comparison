@@ -3,7 +3,20 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from typing import Any
+
+
+@dataclass(frozen=True)
+class RuntimeSessionConfig:
+    """Device-independent session options for a runtime backend."""
+
+    name: str
+    precision: str
+    device_target: str | None = None
+    execution_provider: str | None = None
+    threads: int | None = None
+    artifact_path: str | None = None
 
 
 class RuntimeBackend(ABC):

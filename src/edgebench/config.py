@@ -7,11 +7,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import yaml
 
 from edgebench.paths import CONFIGS_DIR, EXPERIMENTS_DIR, MODELS_DIR
+
+if TYPE_CHECKING:
+    from edgebench.devices.base import DeviceProfile
 
 
 class ConfigError(ValueError):
@@ -97,6 +100,7 @@ class ExperimentConfig:
     runtime: RuntimeConfig
     benchmark: BenchmarkSettings
     metrics: list[str] = field(default_factory=list)
+    device_profile: DeviceProfile | None = None
 
 
 def load_yaml(path: str | Path) -> dict[str, Any]:
@@ -126,7 +130,12 @@ def load_benchmark_defaults(path: str | Path | None = None) -> BenchmarkSettings
     )
 
 
-def load_experiment(path: str | Path) -> ExperimentConfig:
+def load_experiment(
+    path: str | Path,
+    *,
+    devices_dir: str | Path | None = None,
+    defaults_path: str | Path | None = None,
+) -> ExperimentConfig:
     source = Path(path)
     if not source.is_file():
         candidate = EXPERIMENTS_DIR / source
@@ -139,15 +148,25 @@ def load_experiment(path: str | Path) -> ExperimentConfig:
     model_data = _require(data, "model", source)
     runtime_data = _require(data, "runtime", source)
     benchmark_data = data.get("benchmark", {})
+    if benchmark_data is None:
+        benchmark_data = {}
+    if not isinstance(benchmark_data, dict):
+        raise ConfigError(f"'benchmark' must be a mapping in {source}")
 
     if isinstance(model_data, str):
         model = load_model_config(model_data)
     else:
         model = ModelConfig.from_mapping(model_data, source)
 
+    device_name = str(_require(data, "device", source))
+    from edgebench.devices.registry import DeviceRegistry
+
+    profile = DeviceRegistry.load(devices_dir).get(device_name)
+    defaults = load_benchmark_defaults(defaults_path)
+
     return ExperimentConfig(
         experiment=ExperimentMeta(name=str(_require(experiment_data, "name", source))),
-        device=str(_require(data, "device", source)),
+        device=device_name,
         dataset=DatasetConfig(
             name=str(_require(dataset_data, "name", source)),
             split=str(_require(dataset_data, "split", source)),
@@ -157,10 +176,26 @@ def load_experiment(path: str | Path) -> ExperimentConfig:
             name=str(_require(runtime_data, "name", source)),
             precision=str(_require(runtime_data, "precision", source)),
         ),
-        benchmark=BenchmarkSettings(
-            batch_size=int(benchmark_data.get("batch_size", 1)),
-            warmup=int(benchmark_data.get("warmup", 50)),
-            iterations=int(benchmark_data.get("iterations", 500)),
-        ),
+        benchmark=_merge_benchmark(defaults, profile, benchmark_data),
         metrics=list(data.get("metrics", [])),
+        device_profile=profile,
+    )
+
+
+def _merge_benchmark(
+    defaults: BenchmarkSettings,
+    profile: DeviceProfile,
+    experiment_data: dict[str, Any],
+) -> BenchmarkSettings:
+    """Merge global defaults ← device profile ← experiment YAML."""
+    return BenchmarkSettings(
+        batch_size=int(experiment_data.get("batch_size", defaults.batch_size)),
+        warmup=int(experiment_data.get("warmup", profile.warmup)),
+        iterations=int(experiment_data.get("iterations", profile.iterations)),
+        input_width=int(experiment_data.get("input_width", defaults.input_width)),
+        input_height=int(experiment_data.get("input_height", defaults.input_height)),
+        confidence_threshold=float(
+            experiment_data.get("confidence_threshold", defaults.confidence_threshold)
+        ),
+        iou_threshold=float(experiment_data.get("iou_threshold", defaults.iou_threshold)),
     )

@@ -5,15 +5,23 @@ capabilities:
   cuda: true
   gpu: true
 
-supported_runtimes:
-  - pytorch
-  - onnxruntime
-  - tensorrt
-
-supported_precisions:
-  - fp32
-  - fp16
-  - int8
+backends:
+  - runtime: pytorch
+    precision: fp16
+    device_target: cuda
+  - runtime: pytorch
+    precision: fp32
+    device_target: cuda
+  - runtime: onnxruntime
+    precision: fp16
+    device_target: cuda
+    execution_provider: CUDAExecutionProvider
+  - runtime: tensorrt
+    precision: fp16
+    device_target: cuda
+  - runtime: tensorrt
+    precision: int8
+    device_target: cuda
 
 benchmark:
   warmup: 50
@@ -26,3 +34,9 @@ metrics:
     provider: nvidia_smi
   utilization:
     provider: nvidia
+
+metadata:
+  gpu_name: NVIDIA GeForce RTX 3060 Laptop GPU
+  gpu_vram_gb: 6
+  power_profile: ac_high_performance
+

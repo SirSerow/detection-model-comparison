@@ -4,10 +4,13 @@ from __future__ import annotations
 
 from typing import Any
 
-from edgebench.runtimes.base import RuntimeBackend
+from edgebench.runtimes.base import RuntimeBackend, RuntimeSessionConfig
 
 
 class StubRuntime(RuntimeBackend):
+    def __init__(self, session: RuntimeSessionConfig | None = None) -> None:
+        self.session = session
+
     @property
     def name(self) -> str:
         raise NotImplementedError

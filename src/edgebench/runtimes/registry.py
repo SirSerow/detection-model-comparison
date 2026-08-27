@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from edgebench.runtimes.base import RuntimeBackend
+from edgebench.runtimes.base import RuntimeBackend, RuntimeSessionConfig
 from edgebench.runtimes.ncnn import NCNNRuntime
 from edgebench.runtimes.onnxruntime import ONNXRuntimeBackend
 from edgebench.runtimes.pytorch import PyTorchRuntime
@@ -20,17 +20,25 @@ class RuntimeRegistry:
     def names(self) -> list[str]:
         return list(RUNTIMES)
 
-    def get(self, name: str) -> RuntimeBackend:
+    def get(
+        self,
+        name: str,
+        session: RuntimeSessionConfig | None = None,
+    ) -> RuntimeBackend:
         try:
-            return RUNTIMES[name]()
+            cls = RUNTIMES[name]
         except KeyError as exc:
             known = ", ".join(self.names())
             raise KeyError(f"Unknown runtime '{name}'. Known: {known}") from exc
+        return cls(session)
 
 
 def list_runtimes() -> list[str]:
     return RuntimeRegistry().names()
 
 
-def get_runtime(name: str) -> RuntimeBackend:
-    return RuntimeRegistry().get(name)
+def get_runtime(
+    name: str,
+    session: RuntimeSessionConfig | None = None,
+) -> RuntimeBackend:
+    return RuntimeRegistry().get(name, session)

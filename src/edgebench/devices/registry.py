@@ -3,10 +3,24 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 from edgebench.config import ConfigError, load_yaml
-from edgebench.devices.base import DeviceProfile
+from edgebench.devices.base import BackendSupport, DeviceProfile
 from edgebench.paths import DEVICES_DIR
+
+_RESERVED_KEYS = {
+    "name",
+    "architecture",
+    "capabilities",
+    "supported_runtimes",
+    "supported_precisions",
+    "backends",
+    "benchmark",
+    "metrics",
+    "default_threads",
+    "metadata",
+}
 
 
 class DeviceRegistry:
@@ -62,11 +76,60 @@ class DeviceRegistry:
             architecture=str(data.get("architecture", "unknown")),
             has_cuda=bool(capabilities.get("cuda", False)),
             has_gpu=bool(capabilities.get("gpu", False)),
-            supported_runtimes=list(data.get("supported_runtimes", [])),
-            supported_precisions=list(data.get("supported_precisions", [])),
-            default_threads=data.get("default_threads"),
-            power_monitor=providers.get("power"),
+            backends=_parse_backends(data, path),
+            default_threads=_optional_int(data.get("default_threads")),
             warmup=int(benchmark.get("warmup", 50)),
             iterations=int(benchmark.get("iterations", 500)),
             metric_providers=providers,
+            extra=_extra_metadata(data),
         )
+
+
+def _optional_int(value: Any) -> int | None:
+    if value is None:
+        return None
+    return int(value)
+
+
+def _optional_str(value: Any) -> str | None:
+    if value is None:
+        return None
+    return str(value)
+
+
+def _extra_metadata(data: dict[str, Any]) -> dict[str, Any]:
+    extra: dict[str, Any] = {}
+    metadata = data.get("metadata")
+    if isinstance(metadata, dict):
+        extra.update(metadata)
+    for key, value in data.items():
+        if key not in _RESERVED_KEYS:
+            extra[key] = value
+    return extra
+
+
+def _parse_backends(data: dict[str, Any], path: Path) -> tuple[BackendSupport, ...]:
+    raw = data.get("backends")
+    if not isinstance(raw, list) or not raw:
+        raise ConfigError(f"Missing or empty 'backends' list in {path}")
+    backends: list[BackendSupport] = []
+    for index, item in enumerate(raw):
+        if not isinstance(item, dict):
+            raise ConfigError(f"'backends[{index}]' must be a mapping in {path}")
+        runtime = item.get("runtime")
+        precision = item.get("precision")
+        if not runtime or not precision:
+            raise ConfigError(
+                f"'backends[{index}]' requires 'runtime' and 'precision' in {path}"
+            )
+        backends.append(
+            BackendSupport(
+                runtime=str(runtime),
+                precision=str(precision),
+                device_target=_optional_str(item.get("device_target")),
+                execution_provider=_optional_str(item.get("execution_provider")),
+                threads=_optional_int(item.get("threads")),
+            )
+        )
+    return tuple(backends)
+
