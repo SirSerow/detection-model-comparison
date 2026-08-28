@@ -15,8 +15,13 @@ from every statistic. Unsupported combinations are recorded as
 
 from __future__ import annotations
 
+import os
+import platform
+import subprocess
+import sys
 import time
 from dataclasses import dataclass, replace
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from edgebench.config import ConfigError, ExperimentConfig
@@ -30,7 +35,7 @@ from edgebench.models import get_detector
 from edgebench.paths import REPO_ROOT
 from edgebench.runtimes.base import RuntimeBackend, RuntimeSessionConfig
 from edgebench.runtimes.registry import get_runtime, list_runtimes
-from edgebench.types import BenchmarkResult, Detection
+from edgebench.types import BenchmarkResult, Detection, SupportStatus
 
 if TYPE_CHECKING:
     pass
@@ -74,6 +79,8 @@ class BenchmarkRunner:
         blocked = self.capability_result()
         if blocked is not None:
             return blocked
+
+        host_before = _host_metadata()
 
         from edgebench.benchmark.accuracy import evaluate_detections
         from edgebench.benchmark.latency import summarize_latencies
@@ -149,6 +156,8 @@ class BenchmarkRunner:
         for collector in collectors:
             collector.on_run_end()
 
+        host_after = _host_metadata()
+
         model_stats = summarize_latencies(model_samples_ms)
         e2e_stats = summarize_latencies(e2e_samples_ms)
         accuracy = evaluate_detections(predictions, dataset)
@@ -184,6 +193,15 @@ class BenchmarkRunner:
             "warmup_seconds": warmup_seconds,
             "model_load_seconds": load_seconds,
             "software": _software_versions(),
+            "host": host_after,
+            "pre_run": {
+                "temperature_c": host_before.get("temperature_c"),
+                "throttled_flags": host_before.get("throttled_flags"),
+            },
+            "post_run": {
+                "temperature_c": host_after.get("temperature_c"),
+                "throttled_flags": host_after.get("throttled_flags"),
+            },
         }
         if collector_metrics:
             device_metadata["collector_metrics"] = collector_metrics
@@ -198,6 +216,10 @@ class BenchmarkRunner:
             device_metadata=device_metadata,
             **fields,
         )
+        invalid_reason = _environment_invalid_reason(profile.name, device_metadata)
+        if invalid_reason is not None:
+            result.status = SupportStatus.INVALID
+            result.invalid_reason = invalid_reason
         store = ResultStore(REPO_ROOT / "results" / "raw")
         store.write(result)
         return result
@@ -312,6 +334,8 @@ def _software_versions() -> dict[str, str]:
         "ncnn": ("ncnn",),
         "pycocotools": ("pycocotools",),
         "numpy": ("numpy",),
+        "opencv": ("opencv-python", "opencv-python-headless"),
+        "psutil": ("psutil",),
     }
     for label, candidates in packages.items():
         for package in candidates:
@@ -321,3 +345,78 @@ def _software_versions() -> dict[str, str]:
             except metadata.PackageNotFoundError:
                 continue
     return versions
+
+
+def _host_metadata() -> dict[str, Any]:
+    metadata: dict[str, Any] = {
+        "hostname": platform.node(),
+        "architecture": platform.machine(),
+        "kernel": platform.release(),
+        "python": sys.version.split()[0],
+        "cpu_count": os.cpu_count(),
+    }
+    os_release = Path("/etc/os-release")
+    if os_release.is_file():
+        for line in os_release.read_text(encoding="utf-8").splitlines():
+            if line.startswith("PRETTY_NAME="):
+                metadata["os"] = line.split("=", maxsplit=1)[1].strip().strip('"')
+                break
+    try:
+        import psutil
+
+        metadata["ram_total_mb"] = psutil.virtual_memory().total / (1024.0 * 1024.0)
+        metadata["swap_total_mb"] = psutil.swap_memory().total / (1024.0 * 1024.0)
+        metadata["swap_used_mb"] = psutil.swap_memory().used / (1024.0 * 1024.0)
+    except ImportError:
+        pass
+    governor_path = Path(
+        "/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"
+    )
+    try:
+        metadata["cpu_governor"] = governor_path.read_text(encoding="utf-8").strip()
+    except OSError:
+        pass
+    try:
+        revision = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=REPO_ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=2.0,
+        ).stdout.strip()
+    except (FileNotFoundError, subprocess.SubprocessError, OSError):
+        pass
+    else:
+        metadata["git_revision"] = revision
+    try:
+        from edgebench.metrics.temperature.raspberry_pi import (
+            parse_temperature,
+            parse_throttled,
+            read_vcgencmd,
+        )
+
+        temperature = parse_temperature(read_vcgencmd("measure_temp"))
+        throttled = parse_throttled(read_vcgencmd("get_throttled"))
+        if temperature is not None:
+            metadata["temperature_c"] = temperature
+        if throttled is not None:
+            metadata["throttled_flags"] = f"0x{throttled:x}"
+    except ImportError:
+        pass
+    return metadata
+
+
+def _environment_invalid_reason(
+    device: str, device_metadata: dict[str, Any]
+) -> str | None:
+    if device != "raspberry_pi_4":
+        return None
+    post = device_metadata.get("post_run", {})
+    if post.get("throttled_flags") not in {None, "0x0"}:
+        return f"Raspberry Pi throttling flags after run: {post['throttled_flags']}"
+    collector = device_metadata.get("collector_metrics", {})
+    maximum = collector.get("temperature_c_max")
+    if maximum is not None and float(maximum) >= 80.0:
+        return f"Raspberry Pi reached {float(maximum):.1f} C during run"
+    return None

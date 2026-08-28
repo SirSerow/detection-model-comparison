@@ -61,6 +61,9 @@ python -m edgebench run configs/experiments/example_rtmdet_jetson_trt.yaml
 # run the full model × runtime matrix for a device
 python scripts/run_all.py --device jetson_orin_nano_super
 
+# Raspberry Pi phase 1 (requires validated ONNX Runtime and NCNN artifacts)
+./scripts/run_rpi_benchmark.sh
+
 # aggregate raw results into the spec tables
 python -m edgebench aggregate
 python -m edgebench report
@@ -84,20 +87,23 @@ src/edgebench/runtimes/new_runtime.py
 
 A new power/temperature API also needs a collector under `src/edgebench/metrics/`. Neither case should change `BenchmarkRunner`, detector adapters, COCO evaluation, or reporting.
 
+The complete Raspberry Pi OS, SSH, artifact-transfer, thermal, and pilot-run
+procedure is in [docs/raspberry_pi_setup.md](docs/raspberry_pi_setup.md).
+
 ## What works now
 
 - `import edgebench`; registry, capability, and config loading
 - COCO `val2017` adapter with deterministic splits (`coco_val2017_full.txt`, `coco_benchmark_500.txt`, seed `20240613`) and official pycocotools evaluation
 - shared letterbox preprocessing and box rescaling with invertible metadata
 - `BenchmarkRunner.run`: warm-up exclusion, synchronized model-only latency, end-to-end latency, accuracy evaluation, collector lifecycle, raw JSON persistence to `results/raw/<device>/`
-- PyTorch, ONNX Runtime, TensorRT, and NCNN runtime backends (TensorRT/NCNN are on-device verified paths; lazy imports keep CPU-only machines usable)
+- PyTorch, ONNX Runtime, TensorRT, and NCNN runtime backends; lazy imports keep CPU-only machines usable, and converted artifacts must pass their accuracy gates before benchmarking
 - all seven detector adapters: model-specific preprocessing, decode/NMS,
   canonical COCO class mapping, lazy official-package checkpoint loading, and
   ONNX export; PicoDet uses PaddleDetection + `paddle2onnx` and is explicitly
   unsupported under PyTorch
-- exporters: ONNX (`torch.onnx`), TensorRT (`tensorrt` API or `trtexec`), NCNN (`onnx2ncnn`, optional INT8 via `ncnn2table`/`ncnn2int8`)
-- metric collectors: latency, memory (RSS/VRAM), nvidia-smi power/temperature/utilization, tegrastats power (Jetson), linux_sysfs temperature, CPU utilization
-- CLI: `python -m edgebench run|export|aggregate|report`; `scripts/run_all.py` device matrix driver
+- exporters: ONNX (`torch.onnx`), TensorRT (`tensorrt` API or `trtexec`), NCNN (`pnnx`, optional calibrated INT8 via `ncnn2table`/`ncnn2int8`)
+- metric collectors: latency, memory (RSS/VRAM), nvidia-smi power/temperature/utilization, tegrastats power (Jetson), Linux sysfs/Raspberry Pi firmware temperature, CPU utilization
+- CLI: `python -m edgebench run|export|doctor|aggregate|report`; `scripts/run_all.py` device matrix driver
 - reporting: raw JSON aggregation → per-device spec tables with explicit `N/A — unsupported` rows, accuracy-vs-FPS figure
 
 ## External validation still required

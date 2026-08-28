@@ -91,3 +91,27 @@ def test_run_all_matrix_matches_device_backends() -> None:
     assert ("picodet_s", "pytorch", "fp32") in combos  # recorded unsupported at runtime
     assert all(e.benchmark.warmup == 20 for e in experiments)
     assert all(e.device_profile is not None for e in experiments)
+
+
+def test_run_all_filters_backends_models_and_pilot_counts() -> None:
+    spec = importlib.util.spec_from_file_location(
+        "run_all", Path(__file__).resolve().parent.parent / "scripts" / "run_all.py"
+    )
+    assert spec is not None and spec.loader is not None
+    run_all = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(run_all)
+
+    experiments = run_all.experiments_for_device(
+        "raspberry_pi_4",
+        "benchmark_500",
+        backends=[("onnxruntime", "fp32"), ("ncnn", "fp32")],
+        models=["yolox_tiny"],
+        warmup=2,
+        iterations=10,
+    )
+    assert [(item.runtime.name, item.runtime.precision) for item in experiments] == [
+        ("onnxruntime", "fp32"),
+        ("ncnn", "fp32"),
+    ]
+    assert all(item.benchmark.warmup == 2 for item in experiments)
+    assert all(item.benchmark.iterations == 10 for item in experiments)

@@ -3,7 +3,7 @@
 Loads the ``.param`` / ``.bin`` pair sharing ``session.artifact_path`` as
 its base (no extension). Thread count comes from the device profile.
 
-Blob naming convention: ``onnx2ncnn`` names the single input ``in0`` and
+Blob naming convention: ``pnnx`` names the single input ``in0`` and
 outputs ``out0``, ``out1``, ... Output names are discovered from the
 ``.param`` file's final layer so multi-head exports work.
 
@@ -57,6 +57,15 @@ class NCNNRuntime(RuntimeBackend):
         self._net = ncnn.Net()
         if session.threads:
             self._net.opt.num_threads = int(session.threads)
+        if session.precision == "fp32":
+            # PyNCNN enables FP16 storage/arithmetic on capable hosts by
+            # default. Disable it explicitly so an FP32 benchmark is truly
+            # FP32 on every architecture.
+            self._net.opt.use_fp16_storage = False
+            self._net.opt.use_fp16_arithmetic = False
+            self._net.opt.use_fp16_packed = False
+        elif session.precision == "int8":
+            self._net.opt.use_int8_inference = True
         self._net.load_param(str(param_path))
         self._net.load_model(str(bin_path))
 
@@ -104,13 +113,13 @@ class NCNNRuntime(RuntimeBackend):
 def ncnn_mat(chw_array: np.ndarray) -> Any:
     import ncnn
 
-    return ncnn.Mat(chw_array)
+    return ncnn.Mat(chw_array).clone()
 
 
 def _read_blob_names(param_path: Path) -> tuple[list[str], list[str]]:
     """Best-effort parse of input/output blob names from a .param file.
 
-    Falls back to the onnx2ncnn convention (``in0`` / ``out0``) when the
+    Falls back to the pnnx convention (``in0`` / ``out0``) when the
     file cannot be interpreted.
     """
     input_names: list[str] = []

@@ -12,6 +12,7 @@ class SupportStatus(str, Enum):
 
     OK = "ok"
     UNSUPPORTED = "unsupported"
+    INVALID = "invalid"
 
 
 @dataclass(frozen=True)
@@ -40,6 +41,7 @@ class BenchmarkResult:
     batch_size: int = 1
     status: SupportStatus = SupportStatus.OK
     unsupported_reason: str | None = None
+    invalid_reason: str | None = None
     latency_model_mean_ms: float | None = None
     latency_model_p50_ms: float | None = None
     latency_model_p95_ms: float | None = None

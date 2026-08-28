@@ -68,6 +68,13 @@ def _render_row(row: dict[str, Any]) -> str:
             "N/A — unsupported",
         ] + ["N/A"] * (len(COLUMNS) - 3)
         return "| " + " | ".join(cells) + " |"
+    if row.get("status") == "invalid":
+        cells = [
+            str(row.get("model", "")),
+            str(row.get("runtime", "")),
+            "N/A — invalid run",
+        ] + ["N/A"] * (len(COLUMNS) - 3)
+        return "| " + " | ".join(cells) + " |"
     cells = []
     for title, key in COLUMNS:
         value = row.get(key)

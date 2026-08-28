@@ -27,8 +27,12 @@ benchmark:
 
 metrics:
   temperature:
-    provider: linux_sysfs
+    provider: raspberry_pi
+  utilization:
+    provider: cpu
 
 metadata:
   cpu: Cortex-A72
-
+  ram_gb: 8
+  cooling: passive
+  power_measurement: unavailable

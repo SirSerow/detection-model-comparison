@@ -52,6 +52,7 @@ weights/**/*.pdparams
 *.bin
 *.ncnn.bin
 *.ncnn.param
+weights/**/*.validated.json
 
 # Benchmark result payloads (keep directory placeholders)
 results/raw/**

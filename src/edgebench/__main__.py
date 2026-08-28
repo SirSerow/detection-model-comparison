@@ -2,6 +2,8 @@
 
     python -m edgebench run <experiment.yaml>
     python -m edgebench export <model> --to onnx|tensorrt|ncnn [--precision P]
+    python -m edgebench doctor --device DEVICE [--backend RUNTIME:PRECISION]
+    python -m edgebench validate-export MODEL --runtime ncnn [--samples N]
     python -m edgebench aggregate [raw_dir]
     python -m edgebench report [raw_dir] [--out DIR]
 """
@@ -37,6 +39,33 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help="source ONNX for tensorrt/ncnn (default: the onnxruntime artifact)",
     )
+    export_parser.add_argument(
+        "--calibration-table",
+        default=None,
+        help="ncnn2table output required for NCNN INT8 export",
+    )
+
+    doctor_parser = subparsers.add_parser(
+        "doctor", help="check a target device before running benchmarks"
+    )
+    doctor_parser.add_argument("--device", required=True)
+    doctor_parser.add_argument(
+        "--backend",
+        action="append",
+        default=[],
+        help="runtime:precision pair to check; repeat as needed",
+    )
+    doctor_parser.add_argument(
+        "--model", action="append", default=[], help="model artifact to check"
+    )
+
+    validate_parser = subparsers.add_parser(
+        "validate-export", help="compare a converted artifact with ONNX FP32"
+    )
+    validate_parser.add_argument("model", choices=list_detectors())
+    validate_parser.add_argument("--runtime", choices=["ncnn"], required=True)
+    validate_parser.add_argument("--samples", type=int, default=20)
+    validate_parser.add_argument("--max-map-delta", type=float, default=0.005)
 
     aggregate_parser = subparsers.add_parser(
         "aggregate", help="print the result tables for a raw-results directory"
@@ -57,7 +86,33 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "run":
         return _cmd_run(args.experiment)
     if args.command == "export":
-        return _cmd_export(args.model, args.to, args.precision, args.onnx_path)
+        return _cmd_export(
+            args.model,
+            args.to,
+            args.precision,
+            args.onnx_path,
+            args.calibration_table,
+        )
+    if args.command == "doctor":
+        from edgebench.preflight import run_preflight
+
+        return run_preflight(
+            args.device, backend_labels=args.backend, model_names=args.model
+        )
+    if args.command == "validate-export":
+        from edgebench.validation import validate_ncnn_export
+
+        passed, payload = validate_ncnn_export(
+            args.model,
+            samples=args.samples,
+            max_map_delta=args.max_map_delta,
+        )
+        print(
+            f"{args.model} ncnn/fp32: mAP50-95 delta "
+            f"{payload['map50_95_delta']:.6f} "
+            f"(limit {payload['maximum_allowed_delta']:.6f})"
+        )
+        return 0 if passed else 1
     if args.command == "aggregate":
         return _cmd_aggregate(Path(args.raw_dir))
     if args.command == "report":
@@ -74,6 +129,9 @@ def _cmd_run(experiment_path: str) -> int:
     if result.status is SupportStatus.UNSUPPORTED:
         print(f"UNSUPPORTED: {result.unsupported_reason}", file=sys.stderr)
         return 3
+    if result.status is SupportStatus.INVALID:
+        print(f"INVALID: {result.invalid_reason}", file=sys.stderr)
+        return 4
     print(
         f"{result.model} on {result.device} [{result.runtime}/{result.precision}]: "
         f"{result.latency_model_mean_ms:.2f} ms mean, "
@@ -83,7 +141,13 @@ def _cmd_run(experiment_path: str) -> int:
     return 0
 
 
-def _cmd_export(model: str, target: str, precision: str, onnx_path: str | None) -> int:
+def _cmd_export(
+    model: str,
+    target: str,
+    precision: str,
+    onnx_path: str | None,
+    calibration_table: str | None,
+) -> int:
     config = load_model_config(model)
     adapter = get_detector(model)
     adapter.configure(config, _default_settings())
@@ -125,10 +189,37 @@ def _cmd_export(model: str, target: str, precision: str, onnx_path: str | None) 
         print(f"wrote {artifact}")
         return 0
 
-    from edgebench.exporters.ncnn import export_ncnn
+    from edgebench.exporters.ncnn import export_ncnn, quantize_ncnn_int8
 
-    base = artifact_path_for(model, "ncnn", precision, checkpoint=config.checkpoint)
-    param_path, bin_path = export_ncnn(str(source), str(base.parent), model_stem=base.name)
+    if precision not in {"fp32", "int8"}:
+        raise ValueError("NCNN export precision must be 'fp32' or 'int8'")
+    fp32_base = artifact_path_for(
+        model, "ncnn", "fp32", checkpoint=config.checkpoint
+    )
+    if precision == "fp32":
+        param_path, bin_path = export_ncnn(
+            str(source), str(fp32_base.parent), model_stem=fp32_base.name
+        )
+    else:
+        if calibration_table is None:
+            raise ValueError(
+                "NCNN INT8 export requires --calibration-table from ncnn2table"
+            )
+        fp32_param = fp32_base.with_suffix(".param")
+        fp32_bin = fp32_base.with_suffix(".bin")
+        if not fp32_param.is_file() or not fp32_bin.is_file():
+            export_ncnn(
+                str(source), str(fp32_base.parent), model_stem=fp32_base.name
+            )
+        int8_base = artifact_path_for(
+            model, "ncnn", "int8", checkpoint=config.checkpoint
+        )
+        param_path, bin_path = quantize_ncnn_int8(
+            str(fp32_param),
+            str(fp32_bin),
+            calibration_table,
+            output_base=int8_base,
+        )
     print(f"wrote {param_path}\nwrote {bin_path}")
     return 0
 
@@ -162,9 +253,10 @@ def _cmd_report(raw_dir: Path, out_dir: Path) -> int:
 
         figures_dir = REPO_ROOT / "results" / "figures"
         figures_dir.mkdir(parents=True, exist_ok=True)
-        figure = figures_dir / "accuracy_vs_fps.png"
-        plot_accuracy_vs_fps(rows, str(figure))
-        print(f"wrote {figure}")
+        for filename in ("accuracy_vs_fps.png", "accuracy_vs_fps.svg"):
+            figure = figures_dir / filename
+            plot_accuracy_vs_fps(rows, str(figure))
+            print(f"wrote {figure}")
     except ImportError:
         print("matplotlib not installed; skipping figures", file=sys.stderr)
     return 0

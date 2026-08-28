@@ -3,5 +3,8 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 source .venv/bin/activate
-python scripts/run_all.py --device raspberry_pi_4 "$@"
+python -m edgebench doctor --device raspberry_pi_4 \
+  --backend onnxruntime:fp32 --backend ncnn:fp32
+python scripts/run_all.py --device raspberry_pi_4 \
+  --backend onnxruntime:fp32 --backend ncnn:fp32 "$@"
 python -m edgebench report

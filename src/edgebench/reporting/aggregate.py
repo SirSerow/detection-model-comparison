@@ -12,8 +12,8 @@ from edgebench.paths import REPO_ROOT
 def aggregate_results(raw_dir: str | Path | None = None) -> list[dict[str, Any]]:
     """Load every raw BenchmarkResult JSON into row dicts.
 
-    Rows keep their JSON fields; ``status`` is ``"ok"`` or
-    ``"unsupported"`` so reporting can render ``N/A — unsupported`` cells.
+    Rows keep their JSON fields; ``status`` records successful, unsupported,
+    or environmentally invalid runs for reporting.
     """
     root = Path(raw_dir) if raw_dir is not None else REPO_ROOT / "results" / "raw"
     rows: list[dict[str, Any]] = []

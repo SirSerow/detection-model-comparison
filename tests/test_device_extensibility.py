@@ -275,7 +275,7 @@ def test_bind_uses_session_options_from_profile() -> None:
     assert bound.session.threads == 4
     assert [collector.name for collector in bound.collectors] == [
         "latency",
-        "linux_sysfs_temperature",
+        "raspberry_pi_temperature",
     ]
 
 

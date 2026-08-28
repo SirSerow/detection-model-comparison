@@ -13,6 +13,7 @@ from edgebench.metrics.power.nvidia_smi import NvidiaSmiPowerCollector
 from edgebench.metrics.power.raspberry_pi import RaspberryPiPowerCollector
 from edgebench.metrics.temperature.linux_sysfs import LinuxSysfsTemperatureCollector
 from edgebench.metrics.temperature.nvidia import NvidiaTemperatureCollector
+from edgebench.metrics.temperature.raspberry_pi import RaspberryPiTemperatureCollector
 from edgebench.metrics.utilization.cpu import CPUUtilizationCollector
 from edgebench.metrics.utilization.nvidia import NvidiaUtilizationCollector
 
@@ -27,6 +28,7 @@ PROVIDERS: dict[tuple[str, str], type[MetricCollector]] = {
     ("power", "external_meter"): ExternalMeterPowerCollector,
     ("temperature", "linux_sysfs"): LinuxSysfsTemperatureCollector,
     ("temperature", "nvidia"): NvidiaTemperatureCollector,
+    ("temperature", "raspberry_pi"): RaspberryPiTemperatureCollector,
     ("utilization", "cpu"): CPUUtilizationCollector,
     ("utilization", "nvidia"): NvidiaUtilizationCollector,
 }
